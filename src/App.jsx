@@ -14,6 +14,7 @@ const App = () => {
   const [newAuthor, setNewAuthor] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [messageVisible, setMessageVisible] = useState(true);
+  const [successMessage, setSuccessMessage] = useState(null)
 
   useEffect(() => {
     blogService
@@ -32,25 +33,33 @@ const App = () => {
     }
   }, [])
 
-  const addBlog = (event) => {
-    event.preventDefault()
+  const addBlog = async (event) => {
+    event.preventDefault();
+
     const blogObject = {
       title: newTitle,
       author: newAuthor,
-      url: newUrl
+      url: newUrl,
+    };
+
+    try {
+      const returnedBlog = await blogService.create(blogObject);
+      setBlogs(blogs.concat(returnedBlog));
+      setNewTitle('');
+      setNewAuthor('');
+      setNewUrl('');
+      setSuccessMessage(`"${returnedBlog.title}" added successfully`);
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 5000);
+    } catch (error) {
+      console.error('Error creating blog:', error);
+      setErrorMessage('Failed to add blog')
+      setTimeout(() => {
+        setErrorMessage(null)
+      }, 5000)
     }
-
-    blogService
-    .create(blogObject)
-    .then(returnedBlog => {
-      setBlogs(blogs.concat(returnedBlog))
-      setNewBlogs('')
-    })
-  }
-
-  const handleBlogChange = (event) => {
-    setNewBlogs(event.target.value)
-  }
+  };
 
   const handleLogin = async (event) => {
     event.preventDefault()
@@ -68,29 +77,28 @@ const App = () => {
       setUser(user)
       setUsername('')
       setPassword('')
-      setMessageVisible(true);
-    } catch (exception) {
-      setErrorMessage('Wrong credentials')
+      setSuccessMessage(`Welcome ${user.name}`);
       setTimeout(() => {
-        setErrorMessage(null)
-      }, 5000)
+      setSuccessMessage(null);
+    }, 2000);
+    } catch (error) {
+      if (error.response && error.response.status === 401) {
+        setErrorMessage('Wrong credentials')
+        setTimeout(() => {
+          setErrorMessage(null)
+        }, 2000)
+      } else {
+        console.error(`'Login error:', error`)
+      setErrorMessage('Login failed. Please try again later.')
+      }
     }
   }
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMessageVisible(false);
-    }, 3000);
-  
-    return () => {
-      // Clear the timeout if the component unmounts or if the message is hidden before the timeout
-      clearTimeout(timer);
-    };
-  }, [messageVisible]);
 
   const handleLogout = async (event) => {
     event.preventDefault()
     window.localStorage.removeItem('loggedBlogappUser')
+    window.location.reload()
   }
 
   const LoginForm = () => (
@@ -119,27 +127,52 @@ const App = () => {
 
   const BlogForm = () => (
     <form onSubmit={addBlog}>
-      <input
-        value={newBlogs}
-        onChange={handleBlogChange}
-      />
-      <button type="submit">save</button>
-      <button onClick={handleLogout}>logout</button>
-    </form> 
-  )
+      <div>
+        <input
+          type="text"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder="Title"
+        />
+      </div>
+      <div>
+        <input
+          type="text"
+          value={newAuthor}
+          onChange={(e) => setNewAuthor(e.target.value)}
+          placeholder="Author"
+        />
+      </div>
+      <div>
+        <input
+          type="text"
+          value={newUrl}
+          onChange={(e) => setNewUrl(e.target.value)}
+          placeholder="URL"
+        />
+      </div>
+      <button type="submit">Save</button>
+      <button type="button" onClick={handleLogout}>
+        Logout
+      </button>
+    </form>
+  );
 
   return (
     <div>
+      {errorMessage && <div style={{ color: 'red' }}>{errorMessage}
+      </div>}
+      {successMessage && <div style={{ color: 'green' }}>{successMessage}
+      </div>}
       {!user && <h1>Login</h1>}
 
      {!user && LoginForm()}
       {
         user && <div>
           <h2>Blogs</h2>
-          {messageVisible && <h3>{user.name} logged in</h3>}
         {BlogForm()}
         {blogs.map(blog =>
-        <Blog blog={blog} />
+        <Blog key={blog.id} blog={blog} />
         )}
         </div>
        }
